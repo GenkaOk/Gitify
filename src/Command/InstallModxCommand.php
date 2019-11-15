@@ -1,8 +1,11 @@
 <?php
+
 namespace modmore\Gitify\Command;
 
+use DOMDocument;
 use modmore\Gitify\BaseCommand;
 use modmore\Gitify\Mixins\DownloadModx;
+use RuntimeException;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -21,13 +24,13 @@ class InstallModxCommand extends BaseCommand
     use DownloadModx;
 
     public $loadConfig = false;
-    public $loadMODX = false;
+    public $loadMODX   = false;
 
     protected function configure()
     {
         $this
             ->setName('modx:install')
-            ->setAliases(array('install:modx'))
+            ->setAliases(['install:modx'])
             ->setDescription('Downloads, configures and installs a fresh MODX installation. [Note: <info>install:modx</info> will be removed in 1.0, use <info>modx:install</info> instead]')
             ->addArgument(
                 'version',
@@ -46,21 +49,26 @@ class InstallModxCommand extends BaseCommand
     /**
      * Runs the command.
      *
-     * @param InputInterface $input
+     * @param InputInterface  $input
      * @param OutputInterface $output
+     *
      * @return int
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $version = $this->input->getArgument('version');
-        $forced = $this->input->getOption('download');
+        $forced  = $this->input->getOption('download');
+
+        if (!$configFile = $this->input->getOption('config_file')) {
+            $configFile = false;
+        }
 
         if (!$this->getMODX($version, $forced)) {
             return 1; // exit
         }
 
         // Create the XML config
-        $config = $this->createMODXConfig();
+        $config = $configFile ? $configFile : $this->createMODXConfig();
 
         // Variables for running the setup
         $tz = date_default_timezone_get();
@@ -91,17 +99,17 @@ class InstallModxCommand extends BaseCommand
         $this->output->writeln("Please complete following details to install MODX. Leave empty to use the [default].");
 
         $helper = $this->getHelper('question');
-        
+
         $defaultDbHost = 'localhost';
-        $question = new Question("Database Host [{$defaultDbHost}]: ", $defaultDbHost);
-        $dbHost = $helper->ask($this->input, $this->output, $question);
+        $question      = new Question("Database Host [{$defaultDbHost}]: ", $defaultDbHost);
+        $dbHost        = $helper->ask($this->input, $this->output, $question);
 
         $defaultDbName = basename(GITIFY_WORKING_DIR);
-        $question = new Question("Database Name [{$defaultDbName}]: ", $defaultDbName);
-        $dbName = $helper->ask($this->input, $this->output, $question);
+        $question      = new Question("Database Name [{$defaultDbName}]: ", $defaultDbName);
+        $dbName        = $helper->ask($this->input, $this->output, $question);
 
         $question = new Question('Database User [root]: ', 'root');
-        $dbUser = $helper->ask($this->input, $this->output, $question);
+        $dbUser   = $helper->ask($this->input, $this->output, $question);
 
         $question = new Question('Database Password: ');
         $question->setHidden(true);
@@ -111,27 +119,27 @@ class InstallModxCommand extends BaseCommand
         $dbPrefix = $helper->ask($this->input, $this->output, $question);
 
         $question = new Question('Hostname [' . gethostname() . ']: ', gethostname());
-        $host = $helper->ask($this->input, $this->output, $question);
-        $host = rtrim(trim($host), '/');
+        $host     = $helper->ask($this->input, $this->output, $question);
+        $host     = rtrim(trim($host), '/');
 
         $defaultBaseUrl = '/';
-        $question = new Question('Base URL [' . $defaultBaseUrl . ']: ', $defaultBaseUrl);
-        $baseUrl = $helper->ask($this->input, $this->output, $question);
-        $baseUrl = '/' . trim(trim($baseUrl), '/') . '/';
-        $baseUrl = str_replace('//', '/', $baseUrl);
+        $question       = new Question('Base URL [' . $defaultBaseUrl . ']: ', $defaultBaseUrl);
+        $baseUrl        = $helper->ask($this->input, $this->output, $question);
+        $baseUrl        = '/' . trim(trim($baseUrl), '/') . '/';
+        $baseUrl        = str_replace('//', '/', $baseUrl);
 
         $question = new Question('Manager Language [en]: ', 'en');
         $language = $helper->ask($this->input, $this->output, $question);
 
         $defaultMgrUser = basename(GITIFY_WORKING_DIR) . '_admin';
-        $question = new Question('Manager User [' . $defaultMgrUser . ']: ', $defaultMgrUser);
-        $managerUser = $helper->ask($this->input, $this->output, $question);
+        $question       = new Question('Manager User [' . $defaultMgrUser . ']: ', $defaultMgrUser);
+        $managerUser    = $helper->ask($this->input, $this->output, $question);
 
         $question = new Question('Manager User Password [generated]: ', 'generate');
         $question->setHidden(true);
         $question->setValidator(function ($value) {
             if (empty($value) || strlen($value) < 8) {
-                throw new \RuntimeException(
+                throw new RuntimeException(
                     'Please specify a password of at least 8 characters to continue.'
                 );
             }
@@ -145,43 +153,43 @@ class InstallModxCommand extends BaseCommand
             $this->output->writeln("<info>Generated Manager Password: {$managerPass}</info>");
         }
 
-        $question = new Question('Manager Email: ');
+        $question     = new Question('Manager Email: ');
         $managerEmail = $helper->ask($this->input, $this->output, $question);
 
-        $config = array(
-            'database_type' => 'mysql',
-            'database_server' => $dbHost,
-            'database' => $dbName,
-            'database_user' => $dbUser,
-            'database_password' => $dbPass,
+        $config = [
+            'database_type'               => 'mysql',
+            'database_server'             => $dbHost,
+            'database'                    => $dbName,
+            'database_user'               => $dbUser,
+            'database_password'           => $dbPass,
             'database_connection_charset' => 'utf8',
-            'database_charset' => 'utf8',
-            'database_collation' => 'utf8_general_ci',
-            'table_prefix' => $dbPrefix,
-            'https_port' => 443,
-            'http_host' => $host,
-            'cache_disabled' => 0,
-            'inplace' => 1,
-            'unpacked' => 0,
-            'language' => $language,
-            'cmsadmin' => $managerUser,
-            'cmspassword' => $managerPass,
-            'cmsadminemail' => $managerEmail,
-            'core_path' => $directory . 'core/',
-            'context_mgr_path' => $directory . 'manager/',
-            'context_mgr_url' => $baseUrl . 'manager/',
-            'context_connectors_path' => $directory . 'connectors/',
-            'context_connectors_url' => $baseUrl . 'connectors/',
-            'context_web_path' => $directory,
-            'context_web_url' => $baseUrl,
-            'remove_setup_directory' => true
-        );
+            'database_charset'            => 'utf8',
+            'database_collation'          => 'utf8_general_ci',
+            'table_prefix'                => $dbPrefix,
+            'https_port'                  => 443,
+            'http_host'                   => $host,
+            'cache_disabled'              => 0,
+            'inplace'                     => 1,
+            'unpacked'                    => 0,
+            'language'                    => $language,
+            'cmsadmin'                    => $managerUser,
+            'cmspassword'                 => $managerPass,
+            'cmsadminemail'               => $managerEmail,
+            'core_path'                   => $directory . 'core/',
+            'context_mgr_path'            => $directory . 'manager/',
+            'context_mgr_url'             => $baseUrl . 'manager/',
+            'context_connectors_path'     => $directory . 'connectors/',
+            'context_connectors_url'      => $baseUrl . 'connectors/',
+            'context_web_path'            => $directory,
+            'context_web_url'             => $baseUrl,
+            'remove_setup_directory'      => true
+        ];
 
-        $xml = new \DOMDocument('1.0', 'utf-8');
+        $xml  = new DOMDocument('1.0', 'utf-8');
         $modx = $xml->createElement('modx');
 
         foreach ($config as $key => $value) {
-            $modx->appendChild($xml->createElement($key, htmlentities($value, ENT_QUOTES|ENT_XML1)));
+            $modx->appendChild($xml->createElement($key, htmlentities($value, ENT_QUOTES | ENT_XML1)));
         }
 
         $xml->appendChild($modx);
