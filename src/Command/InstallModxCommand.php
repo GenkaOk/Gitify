@@ -38,6 +38,12 @@ class InstallModxCommand extends BaseCommand
                 'The version of MODX to install, in the format 2.3.2-pl. Leave empty or specify "latest" to install the last stable release.',
                 'latest'
             )
+            ->addArgument(
+                'config_file',
+                InputArgument::OPTIONAL,
+                'XML Config file for ModX',
+                false
+            )
             ->addOption(
                 'download',
                 'd',
@@ -59,7 +65,7 @@ class InstallModxCommand extends BaseCommand
         $version = $this->input->getArgument('version');
         $forced  = $this->input->getOption('download');
 
-        if (!$configFile = $this->input->getOption('config_file')) {
+        if (!$configFile = $this->input->getArgument('config_file')) {
             $configFile = false;
         }
 
@@ -182,7 +188,7 @@ class InstallModxCommand extends BaseCommand
             'context_connectors_url'      => $baseUrl . 'connectors/',
             'context_web_path'            => $directory,
             'context_web_url'             => $baseUrl,
-            'remove_setup_directory'      => true
+            'remove_setup_directory'      => true,
         ];
 
         $xml  = new DOMDocument('1.0', 'utf-8');
