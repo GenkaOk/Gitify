@@ -192,7 +192,7 @@ class InstallPackageCommand extends BaseCommand
             $foundPkg = simplexml_load_string ( $response->response );
 
             // no matches, skip empty package name
-            if ($foundPackages['total'] > 0) {
+            if ($foundPkg['total'] > 0) {
 
               $packages [strtolower((string) $foundPkg->name)] = array (
                   'name' => (string) $foundPkg->name,
