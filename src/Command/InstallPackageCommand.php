@@ -140,10 +140,12 @@ class InstallPackageCommand extends BaseCommand
             return false;
         }
 
+        $packageName = array_shift(explode('-', $package));
+
         // Download and install the package from the chosen provider
-        $completed = $this->download($package, $provider, $installOptions);
+        $completed = $this->download($packageName, $provider, $installOptions);
         if (!$completed) {
-            $this->output->writeln("<error>Cannot install package $package.</error>");
+            $this->output->writeln("<error>Cannot install package $packageName.</error>");
 
             return false;
         }
@@ -213,7 +215,7 @@ class InstallPackageCommand extends BaseCommand
             
             // Check for a proper response
             if (!empty($response)) {
-                 
+
                 $foundPackages = simplexml_load_string($response->response);
                 // no matches, simply return
                 if ($foundPackages['total'] == 0) {
